@@ -66,7 +66,10 @@ if __name__ == "__main__":
     send_telegram("🟢 bot started!")
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
+        browser = p.chromium.launch(
+            headless=True,
+            args=["--no-sandbox", "--disable-dev-shm-usage"]
+        )       
         page = browser.new_page()
 
         while True:
