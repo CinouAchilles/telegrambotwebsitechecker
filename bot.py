@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 import requests
 import os
 import time
+import subprocess
 
 # Load environment variables
 load_dotenv()
@@ -15,6 +16,10 @@ ERROR_KEYWORD = os.getenv("ERROR_KEYWORD")
 SUCCESS_KEYWORD = os.getenv("SUCCESS_KEYWORD")
 
 CHECK_INTERVAL = 900  # seconds (15 minutes)
+
+if os.path.exists("/.dockerenv"):
+    # Keep browser binaries in a stable location inside Docker containers.
+    os.environ.setdefault("PLAYWRIGHT_BROWSERS_PATH", "/ms-playwright")
 
 # Validate required environment variables
 if not all([URL, TG_TOKEN, TG_CHAT_ID, KEYWORD]):
@@ -67,14 +72,30 @@ def check_site(page):
         else:
             print("No change")
 
+
+def launch_chromium_with_recovery(playwright):
+    for attempt in range(2):
+        try:
+            return playwright.chromium.launch(
+                headless=True,
+                args=["--no-sandbox", "--disable-dev-shm-usage"]
+            )
+        except Exception as e:
+            is_first_attempt = attempt == 0
+            missing_browser = "Executable doesn't exist" in str(e)
+
+            if is_first_attempt and missing_browser:
+                print("Chromium executable missing. Installing Chromium and retrying...")
+                subprocess.run(["python", "-m", "playwright", "install", "chromium"], check=True)
+                continue
+
+            raise
+
 if __name__ == "__main__":
     send_telegram("🟢 bot started!")
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(
-            headless=True,
-            args=["--no-sandbox", "--disable-dev-shm-usage"]
-        )       
+        browser = launch_chromium_with_recovery(p)
         page = browser.new_page()
 
         while True:
