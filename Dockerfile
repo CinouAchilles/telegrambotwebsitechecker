@@ -1,10 +1,13 @@
 FROM mcr.microsoft.com/playwright/python:v1.42.0-jammy
 
 WORKDIR /app
+
+# Copy project
 COPY . /app
 
-# Install Python dependencies only
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Start your bot
+# Install Playwright browser binaries (chromium)
+RUN python -m playwright install chromium
+
 CMD ["python", "bot.py"]
