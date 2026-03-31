@@ -21,12 +21,16 @@ if not all([URL, TG_TOKEN, TG_CHAT_ID, KEYWORD]):
     raise ValueError("Missing required environment variables. Please check .env file.")
 
 def send_telegram(msg):
+    if not msg:
+        return
+
     try:
-        requests.post(
+        response = requests.post(
             f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage",
             json={"chat_id": TG_CHAT_ID, "text": msg},
             timeout=10
         )
+        response.raise_for_status()
     except Exception as e:
         print("Telegram error:", e)
 
@@ -38,7 +42,7 @@ def check_site(page):
     print(time.strftime("%Y-%m-%d %H:%M:%S"), "Checking...")
 
     try:
-        page.goto(URL)
+        page.goto(URL, timeout=30000)
         # Wait until network is idle, more reliable than fixed timeout
         page.wait_for_load_state("networkidle")
     except Exception as e:
@@ -50,13 +54,14 @@ def check_site(page):
 
     # Case-insensitive keyword search
     if KEYWORD.lower() in html.lower():
-        send_telegram(ERROR_KEYWORD)
+        send_telegram(ERROR_KEYWORD or f"Keyword detected again at {URL}")
         alert_active = True
     else:
         if alert_active:
-            print(SUCCESS_KEYWORD)
+            success_message = SUCCESS_KEYWORD or "Keyword no longer found"
+            print(success_message)
             send_telegram(
-                f"{SUCCESS_KEYWORD}\n{URL}"
+                f"{success_message}\n{URL}"
             )
             alert_active = False
         else:
