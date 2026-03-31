@@ -1,4 +1,4 @@
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 from dotenv import load_dotenv
 import requests
 import os
@@ -16,6 +16,8 @@ ERROR_KEYWORD = os.getenv("ERROR_KEYWORD")
 SUCCESS_KEYWORD = os.getenv("SUCCESS_KEYWORD")
 
 CHECK_INTERVAL = 900  # seconds (15 minutes)
+PAGE_TIMEOUT_MS = int(os.getenv("PAGE_TIMEOUT_MS", "60000"))
+PAGE_RETRIES = int(os.getenv("PAGE_RETRIES", "3"))
 
 if os.path.exists("/.dockerenv"):
     # Keep browser binaries in a stable location inside Docker containers.
@@ -46,13 +48,19 @@ def check_site(page):
 
     print(time.strftime("%Y-%m-%d %H:%M:%S"), "Checking...")
 
-    try:
-        page.goto(URL, timeout=30000)
-        # Wait until network is idle, more reliable than fixed timeout
-        page.wait_for_load_state("networkidle")
-    except Exception as e:
-        print("Page load error:", e)
-        return
+    for attempt in range(1, PAGE_RETRIES + 1):
+        try:
+            # Many modern sites keep background requests open forever, so avoid networkidle.
+            page.goto(URL, timeout=PAGE_TIMEOUT_MS, wait_until="domcontentloaded")
+            break
+        except PlaywrightTimeoutError as e:
+            print(f"Page load timeout ({attempt}/{PAGE_RETRIES}):", e)
+            if attempt == PAGE_RETRIES:
+                return
+            time.sleep(3)
+        except Exception as e:
+            print("Page load error:", e)
+            return
 
     html = page.content()
     print("Length:", len(html))
