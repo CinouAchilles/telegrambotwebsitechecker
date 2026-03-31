@@ -6,4 +6,8 @@ COPY . /app
 
 RUN pip install -r requirements.txt
 
+# Install Chromium at build time (faster startup on Railway)
+RUN python -m playwright install chromium
+
+# Run your bot on container start
 CMD ["python", "bot.py"]
